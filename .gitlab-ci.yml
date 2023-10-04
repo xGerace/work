@@ -1,0 +1,11 @@
+stages:
+  - test
+  - deploy
+
+test:
+  script:
+    - python3 -m unittest discover
+
+deploy:
+  script:
+    - scp ./security_briefing.py your_server:/destination_folder
