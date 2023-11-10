@@ -1,11 +1,12 @@
+image: python:3.9
+
 stages:
-  - test
   - deploy
 
-test:
-  script:
-    - python3 -m unittest discover
+before_script:
+  - pip install requests pandas
 
 deploy:
+  stage: deploy
   script:
-    - scp ./security_briefing.py your_server:/destination_folder
+    - python defender.py
