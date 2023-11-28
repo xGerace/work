@@ -1,0 +1,7 @@
+.env
+venv/
+msdef.py
+mstest.py
+test.py
+Alerts - Microsoft 365 security.csv
+MS Def Important Alerts*.csv
