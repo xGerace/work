@@ -16,9 +16,9 @@ print("TenableIO session initialized.")
 # Specify the VPR score ranges
 vpr_ranges = [
     {'name': 'Critical', 'gte': 9.0, 'lte': 10.0},
-    {'name': 'High', 'gte': 7.0, 'lte': 9.0},
-    {'name': 'Medium', 'gte': 4.0, 'lte': 7.0},
-    {'name': 'Low', 'gte': 0.0, 'lte': 4.0}
+    {'name': 'High', 'gte': 7.0, 'lt': 9.0},  # Adjusted for exclusive upper bound
+    {'name': 'Medium', 'gte': 4.0, 'lt': 7.0},  # Adjusted for exclusive upper bound
+    {'name': 'Low', 'gte': 0.0, 'lt': 4.0}  # Adjusted for exclusive upper bound
 ]
 
 # Initialize counts for each VPR range
@@ -31,7 +31,12 @@ vulnerability_states = ["OPEN", "REOPENED"]
 print("Retrieving vulnerabilities...")
 for vpr_range in vpr_ranges:
     print(f"Initiating vulnerability export for {vpr_range['name']} VPR range...")
-    export = tio.exports.vulns(vpr_score={'gte': vpr_range['gte'], 'lte': vpr_range['lte']},
+    vpr_score_query = {'gte': vpr_range['gte']}
+    if 'lte' in vpr_range:
+        vpr_score_query['lte'] = vpr_range['lte']
+    if 'lt' in vpr_range:
+        vpr_score_query['lt'] = vpr_range['lt']
+    export = tio.exports.vulns(vpr_score=vpr_score_query,
                                state=vulnerability_states)
     vulnerabilities = list(export)
 
