@@ -28,7 +28,7 @@ vpr_counts = {range['name']: 0 for range in vpr_ranges}
 vulnerability_states = ["OPEN", "REOPENED"]
 
 # Retrieve vulnerabilities for each VPR range
-print("Retrieving vulnerabilities...")
+print(f"\nRetrieving vulnerabilities...")
 for vpr_range in vpr_ranges:
     print(f"Initiating vulnerability export for {vpr_range['name']} VPR range...")
     vpr_score_query = {'gte': vpr_range['gte']}

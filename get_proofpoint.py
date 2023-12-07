@@ -91,6 +91,13 @@ def get_campaign_details(campaign_id):
     endpoint = f'/v2/campaign/{campaign_id}'
     return make_api_call(endpoint)
 
+# Function to format date interval
+def format_interval(interval):
+    start_date_str, end_date_str = interval.split('/')
+    start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
+    end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+    return f"{start_date.strftime('%B %d, %Y %H:%M:%S')} to {end_date.strftime('%B %d, %Y %H:%M:%S')}"
+
 # Function to filter members by threat time and status
 def filter_members(members, start_date, end_date):
     filtered_members = []
@@ -177,13 +184,20 @@ def main():
     save_data_to_file(vap_data, 'vap_data.json')
     vap_count = print_and_sort_list(vap_data, 'vap', 'attackIndex')
     print(f"\nTotal Very Attacked People: {vap_count}")
+    if 'interval' in vap_data:
+        formatted_vap_interval = format_interval(vap_data['interval'])
+        print(f"VAP Date Interval: {formatted_vap_interval}\n")
 
     top_clickers_data = fetch_top_clickers_data(window)
     save_data_to_file(top_clickers_data, 'top_clickers_data.json')
     top_clickers_count = print_and_sort_list(top_clickers_data, 'top-clickers', 'clickCount')
     print(f"\nTotal Top Clickers: {top_clickers_count}")
+    if 'interval' in top_clickers_data:
+        formatted_clickers_interval = format_interval(top_clickers_data['interval'])
+        print(f"Top Clickers Date Interval: {formatted_clickers_interval}\n")
 
     print(f"\nData fetched and saved successfully.")
+
 
 # Run the script
 if __name__ == "__main__":

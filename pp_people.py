@@ -103,7 +103,7 @@ def main():
     print(f"\nTotal Very Attacked People: {vap_count}")
     if 'interval' in vap_data:
         formatted_vap_interval = format_interval(vap_data['interval'])
-        print(f"VAP Date Interval: {formatted_vap_interval}\n")
+        print(f"VAP Date Interval: {formatted_vap_interval}")
 
     top_clickers_data = fetch_top_clickers_data(window)
     save_data_to_file(top_clickers_data, 'top_clickers_data.json')
@@ -111,7 +111,7 @@ def main():
     print(f"\nTotal Top Clickers: {top_clickers_count}")
     if 'interval' in top_clickers_data:
         formatted_clickers_interval = format_interval(top_clickers_data['interval'])
-        print(f"Top Clickers Date Interval: {formatted_clickers_interval}\n")
+        print(f"Top Clickers Date Interval: {formatted_clickers_interval}")
 
     print("Data fetched and saved successfully.")
 
