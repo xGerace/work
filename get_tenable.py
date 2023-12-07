@@ -16,9 +16,9 @@ print("TenableIO session initialized.")
 # Specify the VPR score ranges
 vpr_ranges = [
     {'name': 'Critical', 'gte': 9.0, 'lte': 10.0},
-    {'name': 'High', 'gte': 7.0, 'lt': 9.0},  # Adjusted for exclusive upper bound
-    {'name': 'Medium', 'gte': 4.0, 'lt': 7.0},  # Adjusted for exclusive upper bound
-    {'name': 'Low', 'gte': 0.0, 'lt': 4.0}  # Adjusted for exclusive upper bound
+    {'name': 'High', 'gte': 7.0, 'lt': 9.0},
+    {'name': 'Medium', 'gte': 4.0, 'lt': 7.0},
+    {'name': 'Low', 'gte': 0.0, 'lt': 4.0} 
 ]
 
 # Initialize counts for each VPR range

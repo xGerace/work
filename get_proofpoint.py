@@ -12,7 +12,7 @@ api_key = os.getenv('PROOFPOINT_API_KEY')
 api_secret = os.getenv('PROOFPOINT_API_SECRET')
 base_url = "https://tap-api-v2.proofpoint.com"
 
-# Consolidated API Call Function
+# API Call Function
 def make_api_call(endpoint, params=None):
     full_url = f"{base_url}{endpoint}"
     headers = {
@@ -40,7 +40,7 @@ def fetch_top_clickers_data(window, size=100):
     params = {'window': window, 'size': size}
     return make_api_call(endpoint, params)
 
-# Function to print and sort list based on a specified attribute
+# Function to print and sort list based on specified attributes
 def print_and_sort_list(data, list_type, sort_attribute):
     people = {}
     for person in data.get('users', []):
