@@ -198,7 +198,6 @@ def main():
 
     print(f"\nData fetched and saved successfully.")
 
-
 # Run the script
 if __name__ == "__main__":
     main()
