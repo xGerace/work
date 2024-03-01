@@ -11,9 +11,6 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Disable warnings for SSL Certificate for simplicity in testing
-requests.packages.urllib3.disable_warnings()
-
 # Use environment variables
 PANORAMA_HOST = os.getenv('PANORAMA_ENDPOINT')
 API_KEY = os.getenv('PANORAMA_API_KEY')

@@ -7,7 +7,7 @@ USER_IP_THRESHOLD = 15  # Threshold for user+IP checks
 
 def find_csv_filenames(path_to_dir, suffix=".csv"):
     filenames = glob.glob(path_to_dir + "/*" + suffix)
-    return [filename for filename in filenames if "report_job" in filename]
+    return [filename for filename in filenames if "VPNAuthentications" in filename]
 
 def analyze_csv(filename):
     ip_country_mapping = {}  # Store the most recent non-empty country code seen for an IP
