@@ -98,16 +98,17 @@ for hour in range(24):
     else:
         print(f"Failed to initiate or check the job status for the time range from {formatted_start_time} to {formatted_end_time}.")
 
-print("Completed fetching logs for the entire day.")
+print(f"\nCompleted fetching logs for the entire day.")
 
 def analyze_logs():
-    # Initialize counters
+    # Initialize counters and mappings
     ip_counter = Counter()
     user_ip_combo_counter = Counter()
-    
-    # Initialize mappings
     ip_region_mapping = {}
     user_ip_region_mapping = {}  # Track the latest non-"N/A" region for each user+IP combo
+    ip_usernames_mapping = defaultdict(set)  # Tracks unique usernames attempted by each IP
+    success_counter = Counter()  # Added for tracking successful logins
+    failure_counter = Counter()  # Added for tracking failed logins
 
     with open('vpn_logs.csv', mode='r', newline='') as file:
         reader = csv.DictReader(file)
@@ -115,33 +116,57 @@ def analyze_logs():
             ip = row['Public IP']
             user = row['Source User']
             region = row['Source Region']
+            status = row['Status']
             
             # Update IP counter and region mapping
             ip_counter[ip] += 1
             if region != "N/A":
                 ip_region_mapping[ip] = region
             
-            # Handle user+IP combo
+            if status == "success":
+                success_counter[ip] += 1
+            elif status == "failure":
+                failure_counter[ip] += 1
+
+            # Handle user+IP combo for counting attempts
             if user != "N/A" and ip != "N/A":
                 user_ip_combo = f"{user}||{ip}"
                 user_ip_combo_counter[user_ip_combo] += 1
+                ip_usernames_mapping[ip].add(user)  # Add user to set of unique usernames for the IP
                 
                 # Update user+IP region mapping if the current region is not "N/A"
                 if region != "N/A":
                     user_ip_region_mapping[user_ip_combo] = region
 
-    # Display top 10 IPs
-    print("\nTop 10 IPs by count:")
+    # Calculate counts of unique usernames for each IP
+    unique_usernames_count = {ip: len(usernames) for ip, usernames in ip_usernames_mapping.items()}
+    
+    # Sort IPs by the number of unique usernames attempted
+    top_ips_by_unique_usernames = sorted(unique_usernames_count.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    # Display top 10 IPs by count
+    print("\nTop 10 IPs by Count:")
     for ip, count in ip_counter.most_common(10):
         region = ip_region_mapping.get(ip, "N/A")
         print(f"IP: {ip}, Region: {region}, Count: {count}")
 
-    # Display top 10 User+IP Combos
-    print("\nTop 10 User+IP Combos by count:")
+    # Display top 10 User+IP Combos by count
+    print("\nTop 10 User+IP Combos by Count:")
     for user_ip_combo, count in user_ip_combo_counter.most_common(10):
         user, ip = user_ip_combo.split("||")
         # Use the most recently seen non-"N/A" region for this user+IP combo, if available
         region = user_ip_region_mapping.get(user_ip_combo, "N/A")
         print(f"User: {user}, IP: {ip}, Region: {region}, Count: {count}")
+
+    # Display top 10 IPs by Unique Usernames Attempted
+    print("\nTop 10 IPs by Unique Usernames Attempted:")
+    for ip, count in top_ips_by_unique_usernames:
+        region = ip_region_mapping.get(ip, "N/A")
+        print(f"IP: {ip}, Region: {region}, Unique Usernames: {count}")
+
+    total_successes = sum(success_counter.values())
+    total_failures = sum(failure_counter.values())
+    print(f"\nTotal Successful Logins: {total_successes}")
+    print(f"Total Failed Logins: {total_failures}")
 
 analyze_logs()
