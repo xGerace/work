@@ -49,14 +49,14 @@ def fetch_and_process_logs(job_id, is_first):
     if response.status_code == 200:
         root = ET.fromstring(response.text)
         entries = root.findall('.//entry')
-        with open('vpn_logs.csv', mode='a', newline='') as file:  # 'a' to append
+        with open('vpn_logs.csv', mode='a', newline='') as file:
             writer = csv.writer(file)
             if is_first:  # Write header only for the first batch
                 writer.writerow(['Time Generated', 'Public IP', 'Source Region', 'Source User', 'Portal', 'Event ID', 'Status'])
             for entry in entries:
                 raw_src_user = entry.find('srcuser').text if entry.find('srcuser') is not None else ""
                 # Normalize srcuser by checking for empty or whitespace-only strings
-                if not raw_src_user.strip():  # This checks for both empty and whitespace-only strings
+                if not raw_src_user.strip(): 
                     src_user = "N/A"
                 else:
                     # Remove domain prefixes and trim, if the username is not empty
@@ -107,8 +107,8 @@ def analyze_logs():
     ip_region_mapping = {}
     user_ip_region_mapping = {}  # Track the latest non-"N/A" region for each user+IP combo
     ip_usernames_mapping = defaultdict(set)  # Tracks unique usernames attempted by each IP
-    success_counter = Counter()  # Added for tracking successful logins
-    failure_counter = Counter()  # Added for tracking failed logins
+    success_counter = Counter()
+    failure_counter = Counter()
 
     with open('vpn_logs.csv', mode='r', newline='') as file:
         reader = csv.DictReader(file)
@@ -123,6 +123,7 @@ def analyze_logs():
             if region != "N/A":
                 ip_region_mapping[ip] = region
             
+            # Number of success or failure in Status column
             if status == "success":
                 success_counter[ip] += 1
             elif status == "failure":
