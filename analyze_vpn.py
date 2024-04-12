@@ -11,6 +11,10 @@ def is_file_in_date_range(filename, start_date, end_date):
     file_date = datetime.datetime.strptime(file_date_str, '%Y%m%d').date()
     return start_date <= file_date <= end_date
 
+# Initialize dictionaries to track failed login attempts and successful gateway authentications
+failed_attempts_by_ip_portal = {}
+success_at_gateway_after_failure = {}
+
 def get_user_date(prompt):
     while True:
         date_input = input(prompt)
@@ -36,6 +40,28 @@ df['srcregion'].fillna('Unknown', inplace=True)
 
 date_range_label = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
 
+for index, row in df.iterrows():
+    ip = row['IP Address']
+    eventid = row['eventid']
+    status = row['status']  # Assuming this indicates success/failure of the attempt
+    
+    # Track failed attempts during portal-auth
+    if eventid == 'portal-auth' and status == 'failure':
+        if ip not in failed_attempts_by_ip_portal:
+            failed_attempts_by_ip_portal[ip] = 0
+        failed_attempts_by_ip_portal[ip] += 1
+    
+    # Check for successful gateway-auth after failures at portal-auth
+    elif eventid == 'gateway-auth' and status == 'success':
+        if ip in failed_attempts_by_ip_portal:
+            # Check if the IP had a high number of failed attempts before this success
+            failed_attempts = failed_attempts_by_ip_portal[ip]
+            if failed_attempts >= 1:  # Example threshold
+                success_at_gateway_after_failure[ip] = failed_attempts
+                print(f"ALERT: IP {ip} had {failed_attempts} failed portal-auth attempts before a successful gateway-auth.")
+            # Optionally, reset the counter for this IP
+            del failed_attempts_by_ip_portal[ip]
+
 login_attempts_by_country = df.groupby('srcregion').size().sort_values(ascending=False).head(10)
 login_attempts_by_country.plot(kind='bar', figsize=(10, 6), title=f'Top 10 Login Attempts by Country ({date_range_label})')
 plt.xlabel('Country')
@@ -52,7 +78,7 @@ std_attempts = failed_login_counts.std()
 
 # Calculate Z-scores directly using vectorized operations
 z_scores = (failed_login_counts - mean_attempts) / std_attempts
-# Instead of mapping, you directly associate z_scores with IPs in the DataFrame
+# Directly associate z_scores with IPs in the DataFrame
 failed_logins_df['z_score'] = failed_logins_df['IP Address'].map(z_scores)
 
 # Identify outlier IPs based on Z-scores and include Z-scores in the output
@@ -126,10 +152,9 @@ unique_usernames_per_ip_with_region = unique_usernames_per_ip.merge(ip_to_region
 # Combine IP Address and srcregion in the desired format
 unique_usernames_per_ip_with_region['IP Address'] = unique_usernames_per_ip_with_region['IP Address'] + " (" + unique_usernames_per_ip_with_region['srcregion'] + ")"
 
-# Now, when you print the top 10 IPs, the country code will be in parentheses next to the IP Address
+# Print the top 10 IPs with the country code in parentheses next to the IP Address
 print(f"\nTop 10 IPs by Unique Username Attempts with Source Region:\n")
 print(unique_usernames_per_ip_with_region[['IP Address', 'Unique Usernames']].head(10).to_string(index=False))
-
 
 total_attempts_per_ip = failed_logins_df.groupby(['IP Address', 'srcregion']).size().reset_index(name='Total Attempts').sort_values(by='Total Attempts', ascending=False)
 total_attempts_per_ip['IP Address'] = total_attempts_per_ip.apply(lambda x: f"{x['IP Address']} ({x['srcregion']})", axis=1)
@@ -144,3 +169,25 @@ plt.savefig('total_attempts_per_ip_with_country.png')
 
 print("\nTop 10 IPs by Total Number of Attempts:\n")
 print(total_attempts_per_ip[['IP Address', 'Total Attempts']].head(10).to_string(index=False))
+
+# Ensure 'Generate Time' is parsed correctly (you're already doing this, just ensure format compatibility)
+df['Generate Time'] = pd.to_datetime(df['Generate Time'])
+
+# Extract the date part from 'Generate Time' for daily analysis
+df['date'] = df['Generate Time'].dt.date
+
+# Adjusting the 'status' values and calculating daily and total counts
+df['status'] = df['status'].str.capitalize()  # Capitalize the status values
+
+# Group by 'date' and 'status', count, and unstack
+daily_counts = df.groupby(['date', 'status']).size().unstack(fill_value=0)
+
+# Print daily counts
+print("\nDaily Counts of Successes and Failures:")
+for date, row in daily_counts.iterrows():
+    print(f"{date}: Successes = {row.get('Success', 0)}, Failures = {row.get('Failure', 0)}")
+
+# Calculate and print the total number of successes and failures
+total_successes = daily_counts['Success'].sum()
+total_failures = daily_counts['Failure'].sum()
+print(f"\nTotal Successes: {total_successes}, Total Failures: {total_failures}")
