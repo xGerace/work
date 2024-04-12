@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 import os
 import time
 
-# Load environment variables
 load_dotenv()
 
 # Database interaction functions
@@ -20,10 +19,9 @@ def create_connection(db_file):
         print(e)
     return conn
 
-# Updated function to get the latest log time from the database for the specified log type
 def get_latest_log_time(conn, log_type):
     cur = conn.cursor()
-    table_name = f"{log_type.capitalize()}Logs"  # Assuming the table name follows a standard naming convention
+    table_name = f"{log_type.capitalize()}Logs" 
     cur.execute(f"SELECT MAX(Time_Generated) FROM {table_name}")
     last_time = cur.fetchone()[0]
     if last_time is not None:
@@ -31,7 +29,7 @@ def get_latest_log_time(conn, log_type):
         return datetime.strptime(last_time, '%Y/%m/%d %H:%M:%S')
     else:
         # If there are no entries, default to a time far in the past to start fetching from the earliest possible logs
-        return datetime.strptime('2000/01/01 00:00:00', '%Y/%m/%d %H:%M:%S')
+        return datetime.strptime('2024/01/01 00:00:00', '%Y/%m/%d %H:%M:%S')
 
 def insert_traffic_log(conn, log_entry):
     sql = '''INSERT INTO TrafficLogs(Time_Generated, IP_Address, Destination_IP, Source_Region, Destination_Region,
@@ -47,7 +45,6 @@ def insert_traffic_log(conn, log_entry):
     cur = conn.cursor()
     cur.execute(sql, log_entry)
     conn.commit()
-
 
 def insert_threat_log(conn, log_entry):
     sql = '''INSERT INTO ThreatLogs(Time_Generated, IP_Address, Destination_IP, Source_Region, Destination_Region,
@@ -99,10 +96,10 @@ def check_job_status(conn, job_id):
         if response.status_code == 200:
             root = ET.fromstring(response.text)
             job_status = root.find('.//status').text
-            if job_status == 'FIN':  # Adjust to match the exact completion status
+            if job_status == 'FIN': 
                 return True
             else:
-                time.sleep(10)  # Adjust waiting time as necessary
+                time.sleep(10) 
         else:
             print("Failed to check job status:", response.text)
             return False
@@ -162,7 +159,7 @@ def prepare_threat_log_entry(entry):
 def prepare_globalprotect_log_entry(entry):
     return (
         entry.find('time_generated').text if entry.find('time_generated') is not None else "N/A",
-        entry.find('src').text if entry.find('src') is not None else "N/A",
+        entry.find('public_ip').text if entry.find('public_ip') is not None else "N/A",
         entry.find('srcregion').text if entry.find('srcregion') is not None else "N/A",
         entry.find('srcuser').text if entry.find('srcuser') is not None else "N/A",
         entry.find('portal').text if entry.find('portal') is not None else "N/A",
@@ -179,7 +176,7 @@ if __name__ == '__main__':
     log_types = ['globalprotect', 'threat']
 
     for log_type in log_types:
-        print(f"Processing {log_type.capitalize()} logs...")
+        print(f"\nProcessing {log_type.capitalize()} logs...")
         
         # Retrieve the most recent log time for the current log type
         last_log_time = get_latest_log_time(conn, log_type)
