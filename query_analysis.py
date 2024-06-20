@@ -85,7 +85,7 @@ def build_query(log_type):
         now = datetime.now()
         start_datetime = now - timedelta(days=1)
         end_datetime = now
-        date_input = start_datetime.strftime("%Y/%m/%d")  # This line is optional, just for debugging purposes
+        date_input = start_datetime.strftime("%Y/%m/%d")
     else:
         date_parts = date_input.split('/')
         if len(date_parts) == 1:
@@ -122,11 +122,11 @@ def build_query(log_type):
         fields = ['IP address', 'username', 'country', 'portal', 'event ID', 'status']
         db_columns = ['IP_Address', 'Source_User', 'Source_Region', 'Portal', 'eventid', 'Status']
         for field, column in zip(fields, db_columns):
-            user_input = get_user_input(f'Enter {field}, or leave blank: ')
+            user_input = get_user_input(f'Enter {field} or leave blank: ')
             if user_input:
-                if column == 'Source_User':
+                if column in ['IP_Address', 'Source_User']:  # Handling partial match for IP and username
                     conditions.append(f"UPPER({column}) LIKE UPPER(?)")
-                    params.append(f"%{user_input}%")
+                    params.append(user_input)
                 else:
                     conditions.append(f"{column} = ?")
                     params.append(user_input)
@@ -135,10 +135,14 @@ def build_query(log_type):
         fields = ['IP address', 'destination IP', 'source region', 'destination region', 'action', 'threat ID', 'severity']
         db_columns = ['IP_Address', 'Destination_IP', 'Source_Region', 'Destination_Region', 'Action', 'Threat_ID', 'Severity']
         for field, column in zip(fields, db_columns):
-            user_input = get_user_input(f'Enter {field}, or leave blank: ')
+            user_input = get_user_input(f'Enter {field} or leave blank: ')
             if user_input:
-                conditions.append(f"{column} = ?")
-                params.append(user_input)
+                if column in ['IP_Address', 'Destination_IP']:  # Handling partial match for IP addresses
+                    conditions.append(f"{column} LIKE ?")
+                    params.append(user_input)
+                else:
+                    conditions.append(f"{column} = ?")
+                    params.append(user_input)
         base_query = "SELECT * FROM ThreatLogs"
 
     if conditions:
@@ -170,7 +174,7 @@ def main():
         else:
             print("No results found.")
 
-        print(f"\nNumber of results returned: {len(results)}\n")  # Print the count of results
+        print(f"\nNumber of results returned: {len(results)}\n")
 
         if get_user_input("Query another log type? (yes/no): ").strip().lower() != 'yes':
             break

@@ -28,7 +28,7 @@ def get_latest_log_time(conn, log_type):
         # If there is a latest time in the database, return it as a datetime object
         return datetime.strptime(last_time, '%Y/%m/%d %H:%M:%S')
     else:
-        # If there are no entries, default to a time far in the past to start fetching from the earliest possible logs
+        # If there are no entries, default to a time in the past to start fetching logs
         return datetime.strptime('2024/01/01 00:00:00', '%Y/%m/%d %H:%M:%S')
 
 def insert_traffic_log(conn, log_entry):
