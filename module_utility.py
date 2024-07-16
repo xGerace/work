@@ -75,3 +75,12 @@ def build_conditions(start_datetime, end_datetime):
     params = [start_datetime.strftime("%Y/%m/%d %H:%M:%S"), end_datetime.strftime("%Y/%m/%d %H:%M:%S")]
     condition_str = " AND ".join(conditions)
     return condition_str, params
+
+def get_user_confirmation(prompt, default=None):
+    while True:
+        user_input = input(prompt).strip().lower()
+        if not user_input and default:
+            user_input = default
+        if user_input in ['yes', 'no', 'y', 'n']:
+            return user_input in ['yes', 'y']
+        print("Invalid input. Please enter 'yes' or 'no' (or 'y' or 'n').")

@@ -1,95 +1,18 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-from fpdf import FPDF
 from datetime import datetime, timedelta
 from module_database import create_connection
-from module_utility import get_validated_input, get_datetime_range, validate_datetime
+from module_utility import get_validated_input, get_datetime_range, validate_datetime, get_user_confirmation
 from module_globalprotect_analysis import fetch_event_sequence, analyze_event_sequences, print_daily_status_summary
-from module_threat_analysis import threat_analysis, fetch_threat_counts_by_day, get_user_confirmation
+from module_threat_analysis import threat_analysis, fetch_threat_counts_by_day
 from module_statistical_analysis import fetch_failed_logins, perform_statistical_analysis
-from module_entropy_analysis import fetch_login_data, calculate_entropy, identify_anomalies
+from module_entropy_analysis import fetch_login_data, calculate_entropy, identify_anomalies, fetch_all_login_data, calculate_hourly_entropy
+from module_known_offenders import process_known_offenders
+from module_pdf_report import PDFReport, print_and_append
+from module_chart_creation import create_bar_chart, create_stacked_bar_chart, create_entropy_heatmap
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
-
-class PDFReport(FPDF):
-    def __init__(self, start_date, end_date):
-        super().__init__()
-        self.start_date = start_date
-        self.end_date = end_date
-        self.alias_nb_pages()
-
-    def header(self):
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, f'Panorama Analysis Report - {self.start_date} to {self.end_date}', 0, 1, 'L')
-        # Add the logo to the top right corner
-        self.image('organization_logo.png', x=170, y=10, w=30)
-        self.ln(20)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        # Page number
-        self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', 0, 0, 'R')
-
-    def chapter_title(self, title):
-        self.set_font('Arial', 'B', 12)
-        self.set_text_color(0, 0, 0)  # Set text color to black
-        self.cell(0, 10, title, 0, 1, 'L')
-        self.ln(5)
-
-    def chapter_body(self, body):
-        self.set_font('Arial', '', 12)
-        self.set_text_color(0, 0, 0)  # Set text color to black
-        if body:  # Check if body is not None
-            self.multi_cell(0, 10, body)
-        self.ln()
-
-    def add_image(self, image_path, x=None, y=None, w=0, h=0):
-        self.image(image_path, x=x, y=y, w=w, h=h)
-
-    def add_table(self, data, col_widths):
-        self.set_font('Arial', 'B', 12)
-        for header in data.columns:
-            self.cell(col_widths[header], 10, header, 1, 0, 'C')
-        self.ln()
-
-        self.set_font('Arial', '', 12)
-        for index, row in data.iterrows():
-            for col in data.columns:
-                self.cell(col_widths[col], 10, str(row[col]), 1, 0, 'C')
-            self.ln()
-        self.ln()
-
-def create_bar_chart(data, title, x_label, y_label, output_file, threshold=None):
-    plt.figure(figsize=(10, 5))
-    plt.bar(data.keys(), data.values(), color='skyblue')
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.xticks(rotation=45, ha='right')
-    if threshold is not None:
-        plt.axhline(y=threshold, color='r', linestyle='--', label=f'Threshold ({threshold:.2f})')
-        plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-def create_stacked_bar_chart(df, title, output_file):
-    df.plot(kind='bar', stacked=True, figsize=(10, 5))
-    plt.title(title)
-    plt.xlabel('Date')
-    plt.ylabel('Count')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-def print_and_append(pdf, message, to_terminal=True):
-    if to_terminal:
-        print(message)
-    pdf.chapter_body(message)
 
 def main():
     conn = create_connection("panorama_logs.db")
@@ -99,7 +22,7 @@ def main():
         start_datetime_input = get_validated_input('Enter start date/time (YYYY/MM/DD HH:MM:SS), or leave blank: ', validate_datetime, yesterday)
         end_datetime_input = get_validated_input('Enter end date/time (YYYY/MM/DD HH:MM:SS), or leave blank: ', validate_datetime, now)
         
-        exclude_own_ips = get_user_confirmation('Do you want to exclude threats from IPs in the ' + os.getenv('ORG_IP_PREFIX') + '.*.* range? (yes/no): ')
+        exclude_own_ips = get_user_confirmation('Do you want to exclude threats from IPs in the ' + os.getenv('ORG_IP_PREFIX') + '.*.* range? (yes/no): ', default='yes')
         
         start_datetime, end_datetime = get_datetime_range(start_datetime_input, end_datetime_input)
 
@@ -122,18 +45,17 @@ def main():
         daily_status_summary = print_daily_status_summary(conn, start_datetime, end_datetime)
         print_and_append(pdf, daily_status_summary)
 
-        #  Daily Status Summary Chart
         daily_status_df = pd.read_sql_query("""
             SELECT strftime('%Y-%m-%d', datetime(substr(Time_Generated, 1, 4) || '-' || 
-                                                  substr(Time_Generated, 6, 2) || '-' || 
-                                                  substr(Time_Generated, 9, 2) || ' ' || 
-                                                  substr(Time_Generated, 12))) AS Date, 
-                   Status, COUNT(*) AS Count
+                                                substr(Time_Generated, 6, 2) || '-' || 
+                                                substr(Time_Generated, 9, 2) || ' ' || 
+                                                substr(Time_Generated, 12))) AS Date, 
+                Status, COUNT(*) AS Count
             FROM GlobalProtectLogs
             WHERE datetime(substr(Time_Generated, 1, 4) || '-' || 
-                          substr(Time_Generated, 6, 2) || '-' || 
-                          substr(Time_Generated, 9, 2) || ' ' || 
-                          substr(Time_Generated, 12)) >= datetime(?)
+                        substr(Time_Generated, 6, 2) || '-' || 
+                        substr(Time_Generated, 9, 2) || ' ' || 
+                        substr(Time_Generated, 12)) >= datetime(?)
             AND datetime(substr(Time_Generated, 1, 4) || '-' || 
                         substr(Time_Generated, 6, 2) || '-' || 
                         substr(Time_Generated, 9, 2) || ' ' || 
@@ -147,18 +69,16 @@ def main():
             create_stacked_bar_chart(daily_status_pivot, "Daily Status Summary", "daily_status_chart.png")
             pdf.add_image("daily_status_chart.png", w=180)
 
-        # Statistical Analysis
         pdf.chapter_title('Statistical Analysis')
         failed_logins = fetch_failed_logins(conn, start_datetime, end_datetime)
         if failed_logins:
             outlier_summary = perform_statistical_analysis(failed_logins)
             if not outlier_summary.empty:
-                top_outliers = outlier_summary.head(10)  # Limit to top 10 outliers
+                top_outliers = outlier_summary.head(10)
                 stat_msg = "\nTop 10 IPs with unusual number of login attempts (Outliers), their country codes, and Z-scores:"
                 for index, row in top_outliers.iterrows():
                     stat_msg += f"\n{row['IP_Address']} ({row['Source_Region']}): {row['Total Attempts']} attempts (Z-score: {row['z_score']:.2f})"
                 print_and_append(pdf, stat_msg)
-                # Create bar chart for top 10 outliers
                 outliers_dict = top_outliers.set_index('IP_Address')['Total Attempts'].to_dict()
                 create_bar_chart(outliers_dict, "Top 10 Outliers by Total Attempts", "IP Address", "Total Attempts", "outliers_chart.png")
                 pdf.add_image("outliers_chart.png", w=180)
@@ -167,7 +87,6 @@ def main():
         else:
             print_and_append(pdf, "\nNo failed login attempts found within the specified range.")
 
-        # Entropy Analysis
         pdf.chapter_title('Entropy Analysis')
         login_data = fetch_login_data(conn, start_datetime, end_datetime)
         if login_data:
@@ -177,30 +96,61 @@ def main():
             
             entropy_msg = "\nDays with unusually high entropy (anomalies):"
             if not anomaly_days.empty:
-                for date, entropy_value in anomaly_days.iteritems():
+                for date, entropy_value in anomaly_days.items():
                     entropy_msg += f"\nDate: {date}, Entropy: {entropy_value:.2f}"
                 print_and_append(pdf, entropy_msg)
             else:
                 print_and_append(pdf, "\nNo anomalies found based on entropy analysis.")
             
-            # Create bar chart for daily entropy values with threshold
             create_bar_chart(daily_entropy.to_dict(), "Daily Entropy Values", "Date", "Entropy", "entropy_chart.png", threshold=threshold)
             pdf.add_image("entropy_chart.png", w=180)
         else:
             print_and_append(pdf, "\nNo login data found within the specified range.")
 
-        # Threat Analysis
+        pdf.chapter_title('Entropy Heatmap')
+        all_login_data = fetch_all_login_data(conn, start_datetime, end_datetime)
+        if all_login_data:
+            df_all = pd.DataFrame(all_login_data, columns=['Time_Generated', 'IP_Address', 'Source_Region', 'Source_User'])
+            entropy_df = calculate_hourly_entropy(df_all)
+            heatmap_output_file = f'entropy_heatmap.png'
+            create_entropy_heatmap(entropy_df, start_datetime_input, end_datetime_input, heatmap_output_file)
+            pdf.add_image(heatmap_output_file, w=180)
+        else:
+            print_and_append(pdf, "\nNo login data found for heatmap within the specified range.")
+
         pdf.chapter_title('Threat Analysis')
         threat_output = threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips)
         print_and_append(pdf, threat_output)
 
-        # Add Threat Counts by Day Chart
         pdf.chapter_title('Daily Count of Threats')
         threat_counts_by_day = fetch_threat_counts_by_day(conn, start_datetime, end_datetime)
         if not threat_counts_by_day.empty:
             threat_counts_by_day_dict = threat_counts_by_day['Count'].to_dict()
             create_bar_chart(threat_counts_by_day_dict, "Threat Counts by Day", "Date", "Count", "threat_counts_chart.png")
             pdf.add_image("threat_counts_chart.png", w=180)
+
+        # Add Known Offenders Analysis
+        pdf.ln(10) 
+        pdf.chapter_title('Known Offenders Analysis')
+
+        # Process known bad IPs
+        bad_ips_file = 'bad_ips.txt'
+        bad_ips_results = process_known_offenders("panorama_logs.db", bad_ips_file, start_datetime_input, end_datetime_input)
+
+        if bad_ips_results:
+            bad_ips_msg = "\nKnown Bad IPs found in logs:"
+            seen_bad_ips = set()  # To track seen results
+            for result in bad_ips_results:
+                if result not in seen_bad_ips:
+                    seen_bad_ips.add(result)
+                    table_name, first_seen, last_seen, count, ip_addresses, destination_ips, source_regions = result
+                    if table_name == 'ThreatLogs':
+                        bad_ips_msg += f"\nTable: {table_name}, First Seen: {first_seen}, Last Seen: {last_seen}, Count: {count}, IPs: {ip_addresses}, Dest. IPs: {destination_ips}, Regions: {source_regions}"
+                    elif table_name == 'GlobalProtectLogs':
+                        bad_ips_msg += f"\nTable: {table_name}, First Seen: {first_seen}, Last Seen: {last_seen}, Count: {count}, IPs: {ip_addresses}, Users: {destination_ips}, Regions: {source_regions}"
+            print_and_append(pdf, bad_ips_msg, to_terminal=True)
+        else:
+            print_and_append(pdf, "\nNo bad IPs found within the specified range.", to_terminal=True)
 
         conn.close()
 

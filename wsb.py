@@ -91,9 +91,14 @@ excluded_alert_names = {
     "Phish delivered due to an ETR override",
     "Email messages from a campaign removed after delivery",
     "Email reported by user as not junk",
+    "Email messages removed after delivery",
     "Email messages containing malicious URL removed after delivery",
-    "Email messages containing malicious file removed after delivery"
+    "Email messages containing malicious file removed after delivery",
+    "DLP policy",
+    "Anomalous Token"
 }
+
+excluded_prefixes = ["DLP policy"]
 
 # Function to extract data using regex
 def extract_data(alert_str):
@@ -182,8 +187,17 @@ def process_alerts(csv_file_path, start_date, end_date):
             alert_data = {**row, 'title': title, **extracted_data}
             alert_data.pop('evidence', None)
 
-            # Count each alert type if not excluded
-            if title not in excluded_alert_names and title not in excluded_from_count:
+            # Check if the title should be excluded
+            exclude = False
+            if title in excluded_alert_names:
+                exclude = True
+            else:
+                for prefix in excluded_prefixes:
+                    if title.startswith(prefix):
+                        exclude = True
+                        break
+
+            if not exclude and title not in excluded_from_count:
                 alert_type_counts[title] += 1
                 important_alerts_count += 1  # Count as important alert
 
