@@ -15,27 +15,17 @@ def create_connection(db_file):
 def query_database(conn, item, start_date, end_date):
     """Query the database to find occurrences of the IP address or username within a date range."""
     base_query = """
-    SELECT '{}', Time_Generated, COUNT(*) FROM {} WHERE (IP_Address = ? OR {} = ?)
+    SELECT '{}', Time_Generated, COUNT(*)
+    FROM {} WHERE IP_Address = ? AND Time_Generated BETWEEN ? AND ?
     """
-    additional_date_filter = "AND Time_Generated BETWEEN ? AND ? "
-    group_by = "GROUP BY Time_Generated "
-    params = [item, item]
+    params = [item, start_date + " 00:00:00", end_date + " 23:59:59"]
 
-    # Applying date filter if both dates are provided
-    if start_date and end_date:
-        base_query += additional_date_filter
-        params += [start_date + " 00:00:00", end_date + " 23:59:59"]
-
-    # Adding grouping to collate entries by timestamp
-    base_query += group_by
-
-    # Composing final query with UNION ALL
-    query = (base_query.format('ThreatLogs', 'ThreatLogs', 'Destination_IP') +
-             "UNION ALL " +
-             base_query.format('GlobalProtectLogs', 'GlobalProtectLogs', 'Source_User'))
+    query = (base_query.format('ThreatLogs', 'ThreatLogs') +
+             " UNION ALL " +
+             base_query.format('GlobalProtectLogs', 'GlobalProtectLogs'))
 
     cursor = conn.cursor()
-    cursor.execute(query, params * 2)  # Since the same parameters are used twice
+    cursor.execute(query, params * 2)
     results = cursor.fetchall()
     return results
 
@@ -47,15 +37,15 @@ def is_ip_address(item):
     except ValueError:
         return False
 
-def write_to_csv(ips, usernames):
-    """Write the unique IPs and usernames to a CSV file."""
+def write_to_csv(ip_occurrences, username_occurrences):
+    """Write the unique IPs and usernames found in the database to a CSV file with their counts."""
     with open('unique_ips_usernames.csv', 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Type', 'Value'])
-        for ip in ips:
-            writer.writerow(['IP', ip])
-        for username in usernames:
-            writer.writerow(['Username', username])
+        writer.writerow(['Type', 'Value', 'Count'])
+        for ip, count in ip_occurrences.items():
+            writer.writerow(['IP', ip, count])
+        for username, count in username_occurrences.items():
+            writer.writerow(['Username', username, count])
 
 def read_and_search(filename, db_path, start_date=None, end_date=None):
     """Read the file, search each item in the database within the date range, and display results."""
@@ -65,30 +55,31 @@ def read_and_search(filename, db_path, start_date=None, end_date=None):
             items = file.read().splitlines()
 
         total_occurrences = 0
-        found = False
-        unique_usernames = set()
-        unique_ips = set()  # To track unique IP addresses
+        ip_occurrences = {}  # To track occurrences of each IP
+        username_occurrences = {}  # To track occurrences of each username
+
         for item in items:
-            if is_ip_address(item):  # Treat valid IP items as IPs
-                unique_ips.add(item)
-            else:  # Assume anything else is a username
-                unique_usernames.add(item)
             results = query_database(conn, item, start_date, end_date)
             for result in results:
                 table_name, time_generated, count = result
                 if count > 0:
-                    found = True
+                    if is_ip_address(item):
+                        if item not in ip_occurrences:
+                            ip_occurrences[item] = 0
+                        ip_occurrences[item] += count
+                    else:
+                        if item not in username_occurrences:
+                            username_occurrences[item] = 0
+                        username_occurrences[item] += count
                     total_occurrences += count
                     print(f'Found {count} occurrences for {item} in {table_name} at {time_generated}')
 
-        if found:
-            print("\nTotal number of occurrences found:", total_occurrences)
-            print("Total number of unique usernames found:", len(unique_usernames))
-            print("Total number of unique IP addresses found:", len(unique_ips))
-            write_to_csv(unique_ips, unique_usernames) 
-            print("\nUnique IPs and usernames have been written to 'unique_ips_usernames.csv'.")
-        else:
-            print("No occurrences found for any entries.")
+        print("\nTotal number of occurrences found:", total_occurrences)
+        print("Total number of unique IP addresses found in database:", len(ip_occurrences))
+        print("Total number of unique usernames found in database:", len(username_occurrences))
+        write_to_csv(ip_occurrences, username_occurrences)
+        print("\nUnique IPs and usernames found in the database with their counts have been written to 'unique_ips_usernames.csv'.")
+
         conn.close()
     else:
         print("Failed to create database connection.")
