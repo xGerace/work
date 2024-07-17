@@ -1,8 +1,15 @@
 import pandas as pd
 from module_database import execute_query
 from module_utility import build_conditions
+import logging
+import sqlite3
+from datetime import datetime
+from typing import List, Tuple
 
-def fetch_failed_logins(conn, start_datetime, end_datetime):
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def fetch_failed_logins(conn: sqlite3.Connection, start_datetime: datetime, end_datetime: datetime) -> List[Tuple]:
     conditions, params = build_conditions(start_datetime, end_datetime)
     query = f"""
     SELECT IP_Address, Source_Region, Status
@@ -11,7 +18,7 @@ def fetch_failed_logins(conn, start_datetime, end_datetime):
     """
     return execute_query(conn, query, params)
 
-def perform_statistical_analysis(data):
+def perform_statistical_analysis(data: List[Tuple]) -> pd.DataFrame:
     df = pd.DataFrame(data, columns=['IP_Address', 'Source_Region', 'Status'])
     failed_logins_df = df[df['Status'] == 'failure'].copy()
 
@@ -32,4 +39,5 @@ def perform_statistical_analysis(data):
         how='left'
     ).sort_values(by='Total Attempts', ascending=False)
 
+    logger.info(f"Identified {len(outlier_summary)} outliers in failed login attempts.")
     return outlier_summary

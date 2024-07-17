@@ -1,8 +1,14 @@
 from datetime import datetime, timedelta
 from module_database import execute_query
 from module_utility import build_conditions
+import sqlite3
+import logging
+from typing import List, Tuple, Any
 
-def fetch_event_sequence(conn, start_datetime, end_datetime):
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def fetch_event_sequence(conn: sqlite3.Connection, start_datetime: datetime, end_datetime: datetime) -> List[Tuple]:
     conditions, params = build_conditions(start_datetime, end_datetime)
     query = f"""
     SELECT IP_Address, Event_ID, Status, Time_Generated
@@ -13,7 +19,7 @@ def fetch_event_sequence(conn, start_datetime, end_datetime):
     """
     return execute_query(conn, query, params)
 
-def analyze_event_sequences(events):
+def analyze_event_sequences(events: List[Tuple]) -> List[Tuple]:
     alerts = []
     last_event = {}
 
@@ -28,9 +34,10 @@ def analyze_event_sequences(events):
 
         last_event[ip] = (eventid, status, time_generated)
 
+    logger.info(f"Analyzed {len(events)} events and identified {len(alerts)} alerts.")
     return alerts
 
-def print_query_results(results, headers):
+def print_query_results(results: List[Tuple[Any, ...]], headers: List[str]) -> None:
     column_widths = [len(header) for header in headers]
     for row in results:
         for i, cell in enumerate(row):
@@ -40,7 +47,7 @@ def print_query_results(results, headers):
     for row in results:
         print(row_format.format(*row))
 
-def print_daily_status_summary(conn, start_datetime, end_datetime):
+def print_daily_status_summary(conn: sqlite3.Connection, start_datetime: datetime, end_datetime: datetime) -> str:
     query = """
     SELECT strftime('%Y-%m-%d', datetime(substr(Time_Generated, 1, 4) || '-' || 
                                           substr(Time_Generated, 6, 2) || '-' || 
@@ -72,8 +79,9 @@ def print_daily_status_summary(conn, start_datetime, end_datetime):
         date, status, count = result
         if date != current_date:
             if current_date != '':
-                summary += "\n"  # Print a newline for separation between days
+                summary += "\n"
             summary += f"Date: {date}\n"
             current_date = date
         summary += f"  {status.capitalize()} count: {count}\n"
+    logger.info("Generated daily status summary.")
     return summary

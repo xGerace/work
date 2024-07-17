@@ -11,6 +11,11 @@ from module_pdf_report import PDFReport, print_and_append
 from module_chart_creation import create_bar_chart, create_stacked_bar_chart, create_entropy_heatmap
 from dotenv import load_dotenv
 import os
+import logging
+from typing import List, Tuple, Optional
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -29,7 +34,6 @@ def main():
         pdf = PDFReport(start_datetime_input, end_datetime_input)
         pdf.add_page()
 
-        # GlobalProtect Analysis
         pdf.chapter_title('GlobalProtect Analysis')
         events = fetch_event_sequence(conn, start_datetime, end_datetime)
         alerts = analyze_event_sequences(events)
@@ -129,17 +133,15 @@ def main():
             create_bar_chart(threat_counts_by_day_dict, "Threat Counts by Day", "Date", "Count", "threat_counts_chart.png")
             pdf.add_image("threat_counts_chart.png", w=180)
 
-        # Add Known Offenders Analysis
         pdf.ln(10) 
         pdf.chapter_title('Known Offenders Analysis')
 
-        # Process known bad IPs
         bad_ips_file = 'bad_ips.txt'
         bad_ips_results = process_known_offenders("panorama_logs.db", bad_ips_file, start_datetime_input, end_datetime_input)
 
         if bad_ips_results:
             bad_ips_msg = "\nKnown Bad IPs found in logs:"
-            seen_bad_ips = set()  # To track seen results
+            seen_bad_ips = set()
             for result in bad_ips_results:
                 if result not in seen_bad_ips:
                     seen_bad_ips.add(result)
@@ -155,9 +157,10 @@ def main():
         conn.close()
 
         pdf.output("analysis_report.pdf")
+        logger.info("Analysis report generated successfully.")
 
     else:
-        print("Error! Cannot create the database connection.")
+        logger.error("Error! Cannot create the database connection.")
 
 if __name__ == '__main__':
     main()

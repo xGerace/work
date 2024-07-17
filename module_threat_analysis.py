@@ -1,13 +1,19 @@
 from datetime import datetime, timedelta
-from module_database import execute_query
-from module_utility import print_query_results
 import os
 import pandas as pd
 from dotenv import load_dotenv
+from module_database import execute_query
+from module_utility import print_query_results
+import sqlite3
+import logging
+from typing import List, Tuple, Optional
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-def get_date_input(prompt):
+def get_date_input(prompt: str) -> Tuple[Optional[datetime], Optional[datetime]]:
     user_input = input(prompt)
     if not user_input:
         return None, None
@@ -30,21 +36,20 @@ def get_date_input(prompt):
             return dt, dt + timedelta(seconds=1)
         except ValueError:
             continue
-    print("Invalid date format entered. Please use formats like YYYY, YYYY/MM, YYYY/MM/DD HH:MM, etc.")
+    logger.warning("Invalid date format entered. Please use formats like YYYY, YYYY/MM, YYYY/MM/DD HH:MM, etc.")
     return None, None
 
-def get_user_confirmation(prompt):
+def get_user_confirmation(prompt: str) -> bool:
     user_input = input(prompt).lower()
     return user_input in ['yes', 'y']
 
-def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
+def threat_analysis(conn: sqlite3.Connection, start_datetime: datetime, end_datetime: datetime, exclude_own_ips: bool) -> str:
     ip_exclusion_condition = "AND IP_Address NOT LIKE '" + os.getenv('ORG_IP_PREFIX') + ".%' " if exclude_own_ips else ""
 
     params = [start_datetime.strftime("%Y/%m/%d %H:%M:%S"), end_datetime.strftime("%Y/%m/%d %H:%M:%S")]
 
     summary = ""
 
-    # Top 10 Threat IDs by count with severity
     query_threat_ids = f"""
     SELECT Threat_ID, Severity, COUNT(*) AS Count
     FROM ThreatLogs
@@ -57,7 +62,6 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
     results = execute_query(conn, query_threat_ids, params)
     summary += print_query_results(results, ["Threat ID", "Severity", "Count"])
 
-    # Threat count by country
     query_country = f"""
     SELECT Source_Region AS Country, COUNT(*) AS Threats
     FROM ThreatLogs
@@ -72,7 +76,6 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
     results = execute_query(conn, query_country, params)
     summary += print_query_results(results, ["Country", "Threats"])
 
-    # Top 10 IPs by threat count
     query_top_ips = f"""
     SELECT IP_Address, Source_Region, COUNT(*) AS Threat_Count
     FROM ThreatLogs
@@ -87,7 +90,6 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
     results = execute_query(conn, query_top_ips, params)
     summary += print_query_results(results, ["IP Address", "Source Region", "Threat Count"])
 
-    # Breakdown of threats by severity
     query_severity = f"""
     SELECT Severity, COUNT(*) AS Count
     FROM ThreatLogs
@@ -106,7 +108,6 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
     results = execute_query(conn, query_severity, params)
     summary += print_query_results(results, ["Severity", "Count"])
 
-    # Query to count each type of Action within the threat data
     query_actions = f"""
     SELECT Action, COUNT(*) AS Count
     FROM ThreatLogs
@@ -118,7 +119,6 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
     results = execute_query(conn, query_actions, params)
     summary += print_query_results(results, ["Action", "Count"])
 
-    # Daily count of threats
     query_daily = f"""
     SELECT strftime('%Y-%m-%d', replace(Time_Generated, '/', '-')) AS Date, COUNT(*) AS Daily_Count
     FROM ThreatLogs
@@ -132,7 +132,7 @@ def threat_analysis(conn, start_datetime, end_datetime, exclude_own_ips):
 
     return summary
 
-def fetch_threat_counts_by_day(conn, start_datetime, end_datetime):
+def fetch_threat_counts_by_day(conn: sqlite3.Connection, start_datetime: datetime, end_datetime: datetime) -> pd.DataFrame:
     query = """
     SELECT strftime('%Y-%m-%d', replace(Time_Generated, '/', '-')) AS Date, COUNT(*) AS Count
     FROM ThreatLogs

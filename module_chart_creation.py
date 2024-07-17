@@ -1,8 +1,14 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import pandas as pd
+import logging
+from typing import Dict, Optional
 
-def create_bar_chart(data, title, x_label, y_label, output_file, threshold=None):
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def create_bar_chart(data: Dict[str, float], title: str, x_label: str, y_label: str, output_file: str, threshold: Optional[float] = None):
     plt.figure(figsize=(10, 5))
     plt.bar(data.keys(), data.values(), color='skyblue')
     plt.title(title)
@@ -15,8 +21,9 @@ def create_bar_chart(data, title, x_label, y_label, output_file, threshold=None)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
+    logger.info(f"Bar chart saved to {output_file}")
 
-def create_stacked_bar_chart(df, title, output_file):
+def create_stacked_bar_chart(df: pd.DataFrame, title: str, output_file: str):
     df.plot(kind='bar', stacked=True, figsize=(10, 5))
     plt.title(title)
     plt.xlabel('Date')
@@ -25,8 +32,9 @@ def create_stacked_bar_chart(df, title, output_file):
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
+    logger.info(f"Stacked bar chart saved to {output_file}")
 
-def create_entropy_heatmap(entropy_df, start_date, end_date, output_file):
+def create_entropy_heatmap(entropy_df: pd.DataFrame, start_date: str, end_date: str, output_file: str):
     plt.figure(figsize=(12, 8))
     sns.heatmap(entropy_df.T, cmap='viridis', cbar=True)
     plt.title('Entropy of Log Features Over Time')
@@ -40,3 +48,4 @@ def create_entropy_heatmap(entropy_df, start_date, end_date, output_file):
 
     plt.savefig(output_file)
     plt.close()
+    logger.info(f"Entropy heatmap saved to {output_file}")

@@ -1,7 +1,13 @@
 from fpdf import FPDF
+import pandas as pd
+import logging
+from typing import Dict, Optional
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class PDFReport(FPDF):
-    def __init__(self, start_date, end_date):
+    def __init__(self, start_date: str, end_date: str):
         super().__init__()
         self.start_date = start_date
         self.end_date = end_date
@@ -20,23 +26,23 @@ class PDFReport(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', 0, 0, 'R')
 
-    def chapter_title(self, title):
+    def chapter_title(self, title: str):
         self.set_font('Arial', 'B', 12)
         self.set_text_color(0, 0, 0)
         self.cell(0, 10, title, 0, 1, 'L')
         self.ln(5)
 
-    def chapter_body(self, body):
+    def chapter_body(self, body: str):
         self.set_font('Arial', '', 12)
         self.set_text_color(0, 0, 0)
         if body:
             self.multi_cell(0, 10, body)
         self.ln()
 
-    def add_image(self, image_path, x=None, y=None, w=0, h=0):
+    def add_image(self, image_path: str, x: Optional[float] = None, y: Optional[float] = None, w: float = 0, h: float = 0):
         self.image(image_path, x=x, y=y, w=w, h=h)
 
-    def add_table(self, data, col_widths):
+    def add_table(self, data: pd.DataFrame, col_widths: Dict[str, float]):
         self.set_font('Arial', 'B', 12)
         for header in data.columns:
             self.cell(col_widths[header], 10, header, 1, 0, 'C')
@@ -49,7 +55,7 @@ class PDFReport(FPDF):
             self.ln()
         self.ln()
 
-def print_and_append(pdf, message, to_terminal=True):
+def print_and_append(pdf: PDFReport, message: str, to_terminal: bool = True):
     if to_terminal:
-        print(message)
+        logger.info(message)
     pdf.chapter_body(message)
