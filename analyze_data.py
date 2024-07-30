@@ -8,10 +8,8 @@ import os
 import time
 import re
 
-# Load environment variables
 load_dotenv()
 
-# Database interaction functions
 def create_connection(db_file):
     """Create a database connection to a SQLite database specified by db_file"""
     conn = None
@@ -35,7 +33,6 @@ def insert_traffic_log(conn, log_entry):
     cur = conn.cursor()
     cur.execute(sql, log_entry)
     conn.commit()
-
 
 def insert_threat_log(conn, log_entry):
     sql = '''INSERT INTO ThreatLogs(Time_Generated, IP_Address, Destination_IP, Source_Region, Destination_Region,
@@ -64,7 +61,6 @@ def insert_globalprotect_log(conn, log_entry):
     cur.execute(sql, log_entry)
     conn.commit()
 
-# Panorama API interaction functions
 def initiate_log_query(conn, log_type, start_time, end_time):
     PANORAMA_HOST = os.getenv('PANORAMA_ENDPOINT')
     API_KEY = os.getenv('PANORAMA_API_KEY')
@@ -87,10 +83,10 @@ def check_job_status(conn, job_id):
         if response.status_code == 200:
             root = ET.fromstring(response.text)
             job_status = root.find('.//status').text
-            if job_status == 'FIN':  # Adjust to match the exact completion status
+            if job_status == 'FIN': 
                 return True
             else:
-                time.sleep(10)  # Adjust waiting time as necessary
+                time.sleep(10) 
         else:
             print("Failed to check job status:", response.text)
             return False
@@ -150,7 +146,7 @@ def prepare_threat_log_entry(entry):
 def prepare_globalprotect_log_entry(entry):
     return (
         entry.find('time_generated').text if entry.find('time_generated') is not None else "N/A",
-        entry.find('src').text if entry.find('src') is not None else "N/A",
+        entry.find('public_ip').text if entry.find('public_ip') is not None else "N/A",
         entry.find('srcregion').text if entry.find('srcregion') is not None else "N/A",
         entry.find('srcuser').text if entry.find('srcuser') is not None else "N/A",
         entry.find('portal').text if entry.find('portal') is not None else "N/A",
@@ -243,6 +239,6 @@ if __name__ == '__main__':
         else:
             print("Failed to initiate job for the current hour.")
 
-        start_datetime = next_hour  # Move to the next hour
+        start_datetime = next_hour
 
     print("Completed fetching and processing logs.")

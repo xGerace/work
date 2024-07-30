@@ -52,71 +52,33 @@ def validate_date(input_date):
     except ValueError:
         return False
 
-def validate_time(input_time):
-    """Validate the time input."""
-    if input_time == '':
-        return True  # Allow blank input for optional fields
-    try:
-        datetime.strptime(input_time, "%H:%M:%S")
-        return True
-    except ValueError:
-        if len(input_time.split(':')) in [2, 1]:
-            try:
-                datetime.strptime(input_time, "%H:%M")
-                return True
-            except ValueError:
-                try:
-                    datetime.strptime(input_time, "%H")
-                    return True
-                except ValueError:
-                    return False
-        return False
-
 def build_query(log_type):
     conditions = []
     params = []
 
-    # Shared date and time inputs with defaults when blank
-    date_input = get_validated_input('Enter date (YYYY/MM/DD), or leave blank for the last day: ', validate_date)
-    time_input = get_validated_input('Enter time (HH:MM:SS), or leave blank for the whole day: ', validate_time)
+    # Shared date input with defaults when blank
+    date_input = get_validated_input('Enter date (YYYY/MM/DD), month (YYYY/MM), year (YYYY), or leave blank for the entire database: ', validate_date)
 
-    # Default to the last day's data if no date input is provided
-    if not date_input:
-        now = datetime.now()
-        start_datetime = now - timedelta(days=1)
-        end_datetime = now
-        date_input = start_datetime.strftime("%Y/%m/%d")
-    else:
+    # Determine date range based on user input
+    if date_input:
         date_parts = date_input.split('/')
-        if len(date_parts) == 1:
+        if len(date_parts) == 1:  # Year only
             start_datetime = datetime.strptime(date_input, "%Y")
             end_datetime = start_datetime.replace(year=start_datetime.year + 1) - timedelta(seconds=1)
-        elif len(date_parts) == 2:
+        elif len(date_parts) == 2:  # Year and month
             start_datetime = datetime.strptime(date_input, "%Y/%m")
-            if start_datetime.month == 12:
-                end_datetime = start_datetime.replace(year=start_datetime.year + 1, month=1) - timedelta(seconds=1)
-            else:
-                end_datetime = start_datetime.replace(month=start_datetime.month + 1) - timedelta(seconds=1)
-        else:
+            end_datetime = (start_datetime.replace(month=start_datetime.month + 1) - timedelta(seconds=1)) if start_datetime.month < 12 else start_datetime.replace(year=start_datetime.year + 1, month=1) - timedelta(seconds=1)
+        else:  # Year, month, and day
             start_datetime = datetime.strptime(date_input, "%Y/%m/%d")
             end_datetime = start_datetime + timedelta(days=1) - timedelta(seconds=1)
-
-    if not time_input:
-        conditions.append("Time_Generated >= ? AND Time_Generated < ?")
-        params.extend([start_datetime.strftime("%Y/%m/%d %H:%M:%S"), end_datetime.strftime("%Y/%m/%d %H:%M:%S")])
     else:
-        time_parts = time_input.split(':')
-        if len(time_parts) == 1:
-            start_datetime = datetime.combine(start_datetime.date(), datetime.strptime(time_input, "%H").time())
-            end_datetime = start_datetime + timedelta(hours=1) - timedelta(seconds=1)
-        elif len(time_parts) == 2:
-            start_datetime = datetime.combine(start_datetime.date(), datetime.strptime(time_input, "%H:%M").time())
-            end_datetime = start_datetime + timedelta(minutes=1) - timedelta(seconds=1)
-        else:
-            start_datetime = datetime.combine(start_datetime.date(), datetime.strptime(time_input, "%H:%M:%S").time())
-            end_datetime = start_datetime + timedelta(seconds=1) - timedelta(microseconds=1)
-        conditions.append("Time_Generated >= ? AND Time_Generated < ?")
-        params.extend([start_datetime.strftime("%Y/%m/%d %H:%M:%S"), end_datetime.strftime("%Y/%m/%d %H:%M:%S")])
+        # No date input provided, search the entire database
+        start_datetime = datetime.strptime("2020/01/01", "%Y/%m/%d")
+        end_datetime = datetime.now()
+
+    # Add date range condition
+    conditions.append("Time_Generated >= ? AND Time_Generated < ?")
+    params.extend([start_datetime.strftime("%Y/%m/%d %H:%M:%S"), end_datetime.strftime("%Y/%m/%d %H:%M:%S")])
 
     if log_type == 'globalprotect':
         fields = ['IP address', 'username', 'country', 'portal', 'event ID', 'status']
@@ -125,8 +87,8 @@ def build_query(log_type):
             user_input = get_user_input(f'Enter {field} or leave blank: ')
             if user_input:
                 if column in ['IP_Address', 'Source_User']:  # Handling partial match for IP and username
-                    conditions.append(f"UPPER({column}) LIKE UPPER(?)")
-                    params.append(user_input)
+                    conditions.append(f"LOWER({column}) LIKE LOWER(?)")
+                    params.append(f"%{user_input}%")
                 else:
                     conditions.append(f"{column} = ?")
                     params.append(user_input)
@@ -138,8 +100,8 @@ def build_query(log_type):
             user_input = get_user_input(f'Enter {field} or leave blank: ')
             if user_input:
                 if column in ['IP_Address', 'Destination_IP']:  # Handling partial match for IP addresses
-                    conditions.append(f"{column} LIKE ?")
-                    params.append(user_input)
+                    conditions.append(f"LOWER({column}) LIKE LOWER(?)")
+                    params.append(f"%{user_input}%")
                 else:
                     conditions.append(f"{column} = ?")
                     params.append(user_input)
@@ -149,6 +111,10 @@ def build_query(log_type):
         base_query = f"SELECT * FROM {log_type}Logs WHERE " + " AND ".join(conditions)
     else:
         base_query = f"SELECT * FROM {log_type}Logs"  # Default query if no conditions are met
+
+    # Debug prints
+    print("Constructed query:", base_query)
+    print("With parameters:", params)
 
     return base_query, params
 

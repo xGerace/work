@@ -2,28 +2,29 @@ import requests
 import os
 from dotenv import load_dotenv
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 from collections import Counter
 
-# Load .env file
 load_dotenv()
 
-# Function to convert date to epoch time in milliseconds
-def date_to_epoch(date_string):
-    date_format = "%Y-%m-%d"  # Format: Year-Month-Day
-    epoch = int(time.mktime(time.strptime(date_string, date_format))) * 1000
+# Convert date to epoch time in milliseconds
+def date_to_epoch(date_string, is_end=False):
+    date_format = "%Y-%m-%d" 
+    if is_end:
+        # Adjust to include the entire end day by moving to the last second of the day
+        adjusted_date = datetime.strptime(date_string, date_format) + timedelta(days=1, seconds=-1)
+        epoch = int(time.mktime(adjusted_date.timetuple())) * 1000
+    else:
+        epoch = int(time.mktime(time.strptime(date_string, date_format))) * 1000
     return epoch
 
-# Function to fetch alerts from Devo SIEM
 def fetch_alerts(start_epoch, end_epoch):
-    # API endpoint and headers
     url = "https://api-us.devo.com/alerts/v1/alerts/list"
     headers = {
         'standAloneToken': os.getenv('DEVO_API_TOKEN')
     }
 
-    # Parameters for the API request
     params = {
         'limit': 1000,
         'offset': 0,
@@ -31,10 +32,8 @@ def fetch_alerts(start_epoch, end_epoch):
         'to': end_epoch
     }
 
-    # Make the API request
     response = requests.get(url, headers=headers, params=params)
 
-    # Check if the response is successful
     if response.status_code == 200:
         return response.json()
     else:
@@ -44,13 +43,11 @@ def convert_epoch_to_readable(epoch_time):
     return datetime.fromtimestamp(epoch_time / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
 def main():
-    # User input for start and end dates
     start_date = input("Enter the start date (YYYY-MM-DD): ")
     end_date = input("Enter the end date (YYYY-MM-DD): ")
 
-    # Convert dates to epoch time
     start_epoch = date_to_epoch(start_date)
-    end_epoch = date_to_epoch(end_date)
+    end_epoch = date_to_epoch(end_date, is_end=True)
 
     try:
         alerts = fetch_alerts(start_epoch, end_epoch)
@@ -64,23 +61,20 @@ def main():
             earliest_date = min(alert['createDate'] for alert in valid_alerts)
             latest_date = max(alert['createDate'] for alert in valid_alerts)
 
-            # Convert to human-readable format
             earliest_date_readable = convert_epoch_to_readable(int(earliest_date))
             latest_date_readable = convert_epoch_to_readable(int(latest_date))
 
             print(f"\nEarliest alert creation date: {earliest_date_readable}")
             print(f"Latest alert creation date: {latest_date_readable}")
 
-            # Writing to a CSV file
             with open('alerts.csv', mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-                writer.writerow(alerts[0].keys())
+                writer.writerow(valid_alerts[0].keys())
                 for alert in valid_alerts:
                     writer.writerow(alert.values())
 
             print("\nAlerts written to 'alerts.csv'.")
 
-            # Counting and sorting alerts by context
             context_counts = Counter()
             for alert in valid_alerts:
                 alert_prefix = os.getenv('ALERT_PREFIX', '')  # Default to empty string if not found
@@ -91,15 +85,13 @@ def main():
             for context, count in context_counts.most_common():
                 print(f"{context}: {count}")
 
-            # Counting alerts by alertPriority
             priority_counts = Counter()
             for alert in valid_alerts:
                 priority = alert.get('alertPriority')
-                if not priority:  # This will be true for both None and empty string
+                if not priority:  
                     priority = 'None'
                 priority_counts[priority] += 1
 
-            # Order of priority for printing
             priority_order = ['5', '4', '3', '2', '1', '0', 'None']
 
             print("\nAlert Counts by Priority:")

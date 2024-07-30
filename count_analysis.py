@@ -165,7 +165,6 @@ def print_daily_status_summary(conn, start_datetime, end_datetime):
             current_date = date
         print(f"  {status.capitalize()} count: {count}")
 
-
 def main():
     conn = create_connection("panorama_logs.db")
     if conn:
