@@ -37,15 +37,20 @@ def is_ip_address(item):
     except ValueError:
         return False
 
-def write_to_csv(ip_occurrences, username_occurrences):
-    """Write the unique IPs and usernames found in the database to a CSV file with their counts."""
-    with open('unique_ips_usernames.csv', 'w', newline='') as file:
+def write_to_csv(ip_occurrences, username_occurrences, start_date, end_date):
+    """Write the unique IPs and usernames found in the database to a CSV file with their counts and log type."""
+    start_date_safe = start_date.replace("/", "-")
+    end_date_safe = end_date.replace("/", "-")
+    
+    csv_filename = f'unique_ips_usernames_{start_date_safe}_to_{end_date_safe}.csv'
+    
+    with open(csv_filename, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Type', 'Value', 'Count'])
-        for ip, count in ip_occurrences.items():
-            writer.writerow(['IP', ip, count])
-        for username, count in username_occurrences.items():
-            writer.writerow(['Username', username, count])
+        writer.writerow(['Type', 'Value', 'Log Type', 'Count']) 
+        for ip, (count, log_type) in ip_occurrences.items():
+            writer.writerow(['IP', ip, log_type, count])
+        for username, (count, log_type) in username_occurrences.items():
+            writer.writerow(['Username', username, log_type, count])
 
 def read_and_search(filename, db_path, start_date=None, end_date=None):
     """Read the file, search each item in the database within the date range, and display results."""
@@ -55,8 +60,8 @@ def read_and_search(filename, db_path, start_date=None, end_date=None):
             items = file.read().splitlines()
 
         total_occurrences = 0
-        ip_occurrences = {}  # To track occurrences of each IP
-        username_occurrences = {}  # To track occurrences of each username
+        ip_occurrences = {}  # To track occurrences of each IP and log type
+        username_occurrences = {}  # To track occurrences of each username and log type
 
         for item in items:
             results = query_database(conn, item, start_date, end_date)
@@ -65,20 +70,20 @@ def read_and_search(filename, db_path, start_date=None, end_date=None):
                 if count > 0:
                     if is_ip_address(item):
                         if item not in ip_occurrences:
-                            ip_occurrences[item] = 0
-                        ip_occurrences[item] += count
+                            ip_occurrences[item] = (0, table_name)
+                        ip_occurrences[item] = (ip_occurrences[item][0] + count, table_name)
                     else:
                         if item not in username_occurrences:
-                            username_occurrences[item] = 0
-                        username_occurrences[item] += count
+                            username_occurrences[item] = (0, table_name)
+                        username_occurrences[item] = (username_occurrences[item][0] + count, table_name)
                     total_occurrences += count
                     print(f'Found {count} occurrences for {item} in {table_name} at {time_generated}')
 
         print("\nTotal number of occurrences found:", total_occurrences)
         print("Total number of unique IP addresses found in database:", len(ip_occurrences))
         print("Total number of unique usernames found in database:", len(username_occurrences))
-        write_to_csv(ip_occurrences, username_occurrences)
-        print("\nUnique IPs and usernames found in the database with their counts have been written to 'unique_ips_usernames.csv'.")
+        write_to_csv(ip_occurrences, username_occurrences, start_date, end_date)
+        print(f"\nUnique IPs and usernames found in the database with their counts have been written to 'unique_ips_usernames_{start_date}_to_{end_date}.csv'.")
 
         conn.close()
     else:
